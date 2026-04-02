@@ -6,7 +6,9 @@ final class WindowManager {
     static let shared = WindowManager()
 
     private var logWindow: NSWindow?
+    private var logWindowCloseDelegate: WindowCloseDelegate?
     private var settingsWindow: NSWindow?
+    private var settingsWindowCloseDelegate: WindowCloseDelegate?
 
     private init() {}
 
@@ -21,7 +23,8 @@ final class WindowManager {
             title: "CampusVPN 日志",
             view: LogView(),
             size: NSSize(width: 650, height: 420),
-            resizable: true
+            resizable: true,
+            isSettings: false
         )
         window.minSize = NSSize(width: 400, height: 250)
         logWindow = window
@@ -38,13 +41,16 @@ final class WindowManager {
             title: "CampusVPN 设置",
             view: SettingsView(),
             size: NSSize(width: 500, height: 440),
-            resizable: false
+            resizable: false,
+            isSettings: true
         )
         settingsWindow = window
     }
 
-    private func makeWindow<V: View>(title: String, view: V, size: NSSize, resizable: Bool) -> NSWindow {
+    private func makeWindow<V: View>(title: String, view: V, size: NSSize, resizable: Bool, isSettings: Bool) -> NSWindow {
         dismissMenuBarPanel()
+
+        ActivationPolicyManager.beginAuxiliaryWindow()
 
         let controller = NSHostingController(rootView: view)
         var mask: NSWindow.StyleMask = [.titled, .closable]
@@ -55,6 +61,22 @@ final class WindowManager {
         window.styleMask = mask
         window.setContentSize(size)
         window.center()
+
+        let closeDel = WindowCloseDelegate()
+        closeDel.onWindowWillClose = { [weak self] in
+            ActivationPolicyManager.endAuxiliaryWindow()
+            if isSettings {
+                self?.settingsWindowCloseDelegate = nil
+            } else {
+                self?.logWindowCloseDelegate = nil
+            }
+        }
+        window.delegate = closeDel
+        if isSettings {
+            settingsWindowCloseDelegate = closeDel
+        } else {
+            logWindowCloseDelegate = closeDel
+        }
 
         DispatchQueue.main.async {
             window.makeKeyAndOrderFront(nil)

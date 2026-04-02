@@ -9,11 +9,11 @@ struct SettingsView: View {
             connectionTab
                 .tabItem { Label("连接", systemImage: "network") }
 
-            serversTab
-                .tabItem { Label("服务器", systemImage: "server.rack") }
-
             behaviorTab
                 .tabItem { Label("行为", systemImage: "gearshape") }
+
+            serversTab
+                .tabItem { Label("服务器", systemImage: "server.rack") }
 
             advancedTab
                 .tabItem { Label("高级", systemImage: "wrench") }

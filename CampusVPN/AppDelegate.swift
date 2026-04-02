@@ -4,8 +4,11 @@ import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindow: NSWindow?
+    private var onboardingWindowCloseDelegate: WindowCloseDelegate?
     private var logWindow: NSWindow?
+    private var logWindowCloseDelegate: WindowCloseDelegate?
     private var settingsWindow: NSWindow?
+    private var settingsWindowCloseDelegate: WindowCloseDelegate?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = AppSettings.shared
@@ -61,6 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         })
 
+        ActivationPolicyManager.beginAuxiliaryWindow()
+
         let controller = NSHostingController(rootView: onboardingView)
         let window = NSWindow(contentViewController: controller)
         window.title = "CampusVPN 初始设置"
@@ -69,9 +74,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.center()
+
+        let closeDel = WindowCloseDelegate()
+        closeDel.onWindowWillClose = { [weak self] in
+            ActivationPolicyManager.endAuxiliaryWindow()
+            self?.onboardingWindowCloseDelegate = nil
+        }
+        window.delegate = closeDel
+        onboardingWindowCloseDelegate = closeDel
+
         window.makeKeyAndOrderFront(nil)
-        window.level = .floating
-        NSApp.activate(ignoringOtherApps: true)
 
         self.onboardingWindow = window
     }
@@ -84,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        ActivationPolicyManager.beginAuxiliaryWindow()
+
         let controller = NSHostingController(rootView: LogView())
         let window = NSWindow(contentViewController: controller)
         window.title = "CampusVPN 日志"
@@ -91,8 +105,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.minSize = NSSize(width: 400, height: 250)
         window.center()
+
+        let closeDel = WindowCloseDelegate()
+        closeDel.onWindowWillClose = { [weak self] in
+            ActivationPolicyManager.endAuxiliaryWindow()
+            self?.logWindowCloseDelegate = nil
+        }
+        window.delegate = closeDel
+        logWindowCloseDelegate = closeDel
+
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
         self.logWindow = window
     }
@@ -105,14 +127,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        ActivationPolicyManager.beginAuxiliaryWindow()
+
         let controller = NSHostingController(rootView: SettingsView())
         let window = NSWindow(contentViewController: controller)
         window.title = "CampusVPN 设置"
         window.setContentSize(NSSize(width: 500, height: 440))
         window.styleMask = [.titled, .closable]
         window.center()
+
+        let closeDel = WindowCloseDelegate()
+        closeDel.onWindowWillClose = { [weak self] in
+            ActivationPolicyManager.endAuxiliaryWindow()
+            self?.settingsWindowCloseDelegate = nil
+        }
+        window.delegate = closeDel
+        settingsWindowCloseDelegate = closeDel
+
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
         self.settingsWindow = window
     }

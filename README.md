@@ -6,6 +6,32 @@
 
 ---
 
+## 首次使用
+
+1. 启动后完成 **引导页**：填写 VPN 服务器地址、用户名、密码（密码进 Keychain）、校园 SSID 关键词等。
+2. 在 **系统设置 → 隐私与安全性 → 定位服务** 中为 CampusVPN 开启定位（**使用期间**即可），以便读取当前 Wi‑Fi 名称。
+3. 确保 Docker/Colima 已运行，镜像可正常拉取。
+
+### 首次引导流程
+
+**欢迎** — 功能概览（Wi‑Fi 识别、自动重连、双模式代理、手动控制）：
+
+![引导 · 欢迎](docs/screenshots/onboarding-welcome.png)
+
+**配置 VPN 账号** — 服务器地址、用户名与密码（密码写入系统钥匙串）：
+
+![引导 · 配置 VPN 账号](docs/screenshots/onboarding-vpn-account.png)
+
+**运行环境** — 检测 Docker / Colima 等容器运行时，供 EasyConnect 使用：
+
+![引导 · 运行环境就绪](docs/screenshots/onboarding-runtime.png)
+
+**完成** — 应用将常驻菜单栏：
+
+![引导 · 设置完成](docs/screenshots/onboarding-complete.png)
+
+---
+
 ## 界面预览
 
 ### 菜单栏主面板
@@ -89,32 +115,6 @@ git tag v1.0.1
 git push origin main
 git push origin v1.0.1
 ```
-
----
-
-## 首次使用
-
-1. 启动后完成 **引导页**：填写 VPN 服务器地址、用户名、密码（密码进 Keychain）、校园 SSID 关键词等。
-2. 在 **系统设置 → 隐私与安全性 → 定位服务** 中为 CampusVPN 开启定位（**使用期间**即可），以便读取当前 Wi‑Fi 名称。
-3. 确保 Docker/Colima 已运行，镜像可正常拉取。
-
-### 首次引导流程
-
-**欢迎** — 功能概览（Wi‑Fi 识别、自动重连、双模式代理、手动控制）：
-
-![引导 · 欢迎](docs/screenshots/onboarding-welcome.png)
-
-**配置 VPN 账号** — 服务器地址、用户名与密码（密码写入系统钥匙串）：
-
-![引导 · 配置 VPN 账号](docs/screenshots/onboarding-vpn-account.png)
-
-**运行环境** — 检测 Docker / Colima 等容器运行时，供 EasyConnect 使用：
-
-![引导 · 运行环境就绪](docs/screenshots/onboarding-runtime.png)
-
-**完成** — 应用将常驻菜单栏：
-
-![引导 · 设置完成](docs/screenshots/onboarding-complete.png)
 
 ---
 
