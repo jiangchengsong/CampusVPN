@@ -6,6 +6,30 @@
 
 ---
 
+## 界面预览
+
+### 菜单栏主面板
+
+![菜单栏主面板：校园网/代理状态、快捷入口，以及置于底部的 GPU 监控](docs/screenshots/menubar-panel.png)
+
+点击菜单栏图标展开；可查看当前 Wi‑Fi 与策略标签、切换 SOCKS5 / 系统代理、打开日志与设置。GPU 列表在面板最下方，降低误触。
+
+### 设置窗口
+
+**连接** — VPN 服务器、账号与 SOCKS5 端口：
+
+![设置 · 连接](docs/screenshots/settings-connection.png)
+
+**行为** — 自动连接/重连、登录启动、校园网关键词与默认代理模式：
+
+![设置 · 行为](docs/screenshots/settings-behavior.png)
+
+**服务器** — 远程 GPU 机器的 SSH 与刷新间隔（用于 `nvidia-smi` 轮询）：
+
+![设置 · 服务器（GPU 监控）](docs/screenshots/settings-servers.png)
+
+---
+
 ## 功能概览
 
 | 能力                 | 说明                                                                                              |
@@ -74,11 +98,29 @@ git push origin v1.0.1
 2. 在 **系统设置 → 隐私与安全性 → 定位服务** 中为 CampusVPN 开启定位（**使用期间**即可），以便读取当前 Wi‑Fi 名称。
 3. 确保 Docker/Colima 已运行，镜像可正常拉取。
 
+### 首次引导流程
+
+**欢迎** — 功能概览（Wi‑Fi 识别、自动重连、双模式代理、手动控制）：
+
+![引导 · 欢迎](docs/screenshots/onboarding-welcome.png)
+
+**配置 VPN 账号** — 服务器地址、用户名与密码（密码写入系统钥匙串）：
+
+![引导 · 配置 VPN 账号](docs/screenshots/onboarding-vpn-account.png)
+
+**运行环境** — 检测 Docker / Colima 等容器运行时，供 EasyConnect 使用：
+
+![引导 · 运行环境就绪](docs/screenshots/onboarding-runtime.png)
+
+**完成** — 应用将常驻菜单栏：
+
+![引导 · 设置完成](docs/screenshots/onboarding-complete.png)
+
 ---
 
 ## GPU 监控配置
 
-在 **设置** 中维护 SSH 主机列表（别名、用户、`host:port`）。应用通过 `ssh` 调用远程 `nvidia-smi`；请确保本机已配置免密或可用 **ssh-agent**，且网络可达目标主机。
+在 **设置 → 服务器** 中维护 SSH 主机列表（别名、用户、`host:port`）。应用通过 `ssh` 调用远程 `nvidia-smi`；请确保本机已配置免密或可用 **ssh-agent**，且网络可达目标主机。菜单栏与主面板底部会汇总各机「空闲/总卡数」。
 
 仓库内默认占位数据仅为示例，**请替换为你自己的服务器信息**，勿将真实地址与账号提交到公开仓库。
 
@@ -88,6 +130,7 @@ git push origin v1.0.1
 
 ```
 CampusVPN/
+├── docs/screenshots/      # README 用界面截图
 ├── Package.swift          # SwiftPM 可执行目标
 ├── build.sh               # 组装 Info.plist 与 .app
 ├── setup.sh               # 可选：XcodeGen 生成 Xcode 工程
