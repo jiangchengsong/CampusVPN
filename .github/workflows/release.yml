@@ -22,11 +22,18 @@ jobs:
           chmod +x build.sh
           ./build.sh release
 
-      - name: Zip .app (GitHub 仅支持单文件附件，zip 内即为 CampusVPN.app)
+      # zip 根目录即为 CampusVPN.app/；解压后当前文件夹里应直接出现 CampusVPN.app（勿多一层目录）
+      - name: 打包 CampusVPN.app.zip
         run: |
+          test -d .build/release/CampusVPN.app
           cd .build/release
-          zip -r -y "../../CampusVPN.app.zip" CampusVPN.app
+          zip -r -y ../../CampusVPN.app.zip CampusVPN.app
           cd ../..
+          unzip -l CampusVPN.app.zip | head -15
+          unzip -q CampusVPN.app.zip -d /tmp/cvpn-unzip-test
+          test -d /tmp/cvpn-unzip-test/CampusVPN.app
+          test -f /tmp/cvpn-unzip-test/CampusVPN.app/Contents/Info.plist
+          rm -rf /tmp/cvpn-unzip-test
           shasum -a 256 CampusVPN.app.zip | tee SHA256SUMS.txt
 
       - name: Upload to GitHub Release

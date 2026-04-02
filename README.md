@@ -118,7 +118,7 @@ open /Applications/CampusVPN.app
 
 ## 下载成品（GitHub Releases）
 
-在本仓库 GitHub 的 **Releases** 页面下载 **`CampusVPN.app.zip`**。解压后即为 **`CampusVPN.app`**，拖入「应用程序」即可。（GitHub Release 只能上传单个文件，因此用 zip 封装应用包；当前 CI 在 Apple Silicon 上构建。）
+在本仓库 GitHub 的 **Releases** 页面下载 **`CampusVPN.app.zip`**。在「访达」或终端中解压后，**当前目录下应直接出现 `CampusVPN.app`**（应用包，非再嵌套一层文件夹），拖入「应用程序」即可。GitHub 只能上传单个附件，故用 zip 封装；发布前 CI 会校验 zip 内根路径为 `CampusVPN.app/`。（当前 CI 在 Apple Silicon 上构建。）
 
 首次从网络打开未公证的应用时，可在「访达」中右键 → **打开**，或在「系统设置 → 隐私与安全性」中允许运行。
 
