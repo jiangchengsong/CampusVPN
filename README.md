@@ -14,21 +14,28 @@
 
 ### 首次引导流程
 
-**欢迎** — 功能概览（Wi‑Fi 识别、自动重连、双模式代理、手动控制）：
-
-![引导 · 欢迎](docs/screenshots/onboarding-welcome.png)
-
-**配置 VPN 账号** — 服务器地址、用户名与密码（密码写入系统钥匙串）：
-
-![引导 · 配置 VPN 账号](docs/screenshots/onboarding-vpn-account.png)
-
-**运行环境** — 检测 Docker / Colima 等容器运行时，供 EasyConnect 使用：
-
-![引导 · 运行环境就绪](docs/screenshots/onboarding-runtime.png)
-
-**完成** — 应用将常驻菜单栏：
-
-![引导 · 设置完成](docs/screenshots/onboarding-complete.png)
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+<strong>① 引导 · 欢迎</strong><br/><sub>功能概览</sub><br/>
+<img src="docs/screenshots/onboarding-welcome.png" width="260" alt="引导 · 欢迎"/>
+</td>
+<td align="center" valign="top" width="33%">
+<strong>② 引导 · 配置 VPN 账号</strong><br/><sub>服务器、学号、密码（进钥匙串）</sub><br/>
+<img src="docs/screenshots/onboarding-vpn-account.png" width="260" alt="引导 · 配置 VPN 账号"/>
+</td>
+<td align="center" valign="top" width="33%">
+<strong>③ 引导 · 运行环境</strong><br/><sub>Docker / Colima 检测</sub><br/>
+<img src="docs/screenshots/onboarding-runtime.png" width="260" alt="引导 · 运行环境"/>
+</td>
+</tr>
+<tr>
+<td align="center" colspan="3" valign="top">
+<strong>④ 引导 · 设置完成</strong><br/><sub>应用常驻菜单栏</sub><br/>
+<img src="docs/screenshots/onboarding-complete.png" width="260" alt="引导 · 设置完成"/>
+</td>
+</tr>
+</table>
 
 ---
 
@@ -36,23 +43,31 @@
 
 ### 菜单栏主面板
 
-![菜单栏主面板：校园网/代理状态、快捷入口，以及置于底部的 GPU 监控](docs/screenshots/menubar-panel.png)
+<p align="center">
+<strong>菜单栏主面板</strong><br/><sub>校园网/代理状态、日志与设置、底部 GPU 监控</sub><br/>
+<img src="docs/screenshots/menubar-panel.png" width="320" alt="菜单栏主面板"/>
+</p>
 
 点击菜单栏图标展开；可查看当前 Wi‑Fi 与策略标签、切换 SOCKS5 / 系统代理、打开日志与设置。GPU 列表在面板最下方，降低误触。
 
 ### 设置窗口
 
-**连接** — VPN 服务器、账号与 SOCKS5 端口：
-
-![设置 · 连接](docs/screenshots/settings-connection.png)
-
-**行为** — 自动连接/重连、登录启动、校园网关键词与默认代理模式：
-
-![设置 · 行为](docs/screenshots/settings-behavior.png)
-
-**服务器** — 远程 GPU 机器的 SSH 与刷新间隔（用于 `nvidia-smi` 轮询）：
-
-![设置 · 服务器（GPU 监控）](docs/screenshots/settings-servers.png)
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
+<strong>设置 · 连接</strong><br/><sub>VPN 服务器、账号、SOCKS5 端口</sub><br/>
+<img src="docs/screenshots/settings-connection.png" width="260" alt="设置 · 连接"/>
+</td>
+<td align="center" valign="top" width="33%">
+<strong>设置 · 行为</strong><br/><sub>自动连接/重连、校园网关键词、代理模式</sub><br/>
+<img src="docs/screenshots/settings-behavior.png" width="260" alt="设置 · 行为"/>
+</td>
+<td align="center" valign="top" width="33%">
+<strong>设置 · 服务器</strong><br/><sub>GPU SSH 主机与刷新间隔</sub><br/>
+<img src="docs/screenshots/settings-servers.png" width="260" alt="设置 · 服务器（GPU）"/>
+</td>
+</tr>
+</table>
 
 ---
 
