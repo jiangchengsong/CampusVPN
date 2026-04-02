@@ -103,11 +103,11 @@ open /Applications/CampusVPN.app
 
 ## 下载成品（GitHub Releases）
 
-在本仓库 GitHub 的 **Releases** 页面下载 `CampusVPN-macos-arm64.zip`（由 CI 在 Apple Silicon 运行器上构建；文件名中的架构以实际发布为准）。解压后将 `CampusVPN.app` 拖入「应用程序」即可。
+在本仓库 GitHub 的 **Releases** 页面下载 **`CampusVPN.app.zip`**。解压后即为 **`CampusVPN.app`**，拖入「应用程序」即可。（GitHub Release 只能上传单个文件，因此用 zip 封装应用包；当前 CI 在 Apple Silicon 上构建。）
 
 首次从网络打开未公证的应用时，可在「访达」中右键 → **打开**，或在「系统设置 → 隐私与安全性」中允许运行。
 
-**维护者发布新版本**：先按需修改 `build.sh` 里的 `CFBundleShortVersionString` / `CFBundleVersion`，再打 tag 并推送，GitHub Actions 会自动构建并上传 zip 与 `SHA256SUMS.txt`：
+**维护者发布新版本**：先按需修改 `build.sh` 里的 `CFBundleShortVersionString` / `CFBundleVersion`，再打 tag 并推送，GitHub Actions 会自动构建并上传 `CampusVPN.app.zip` 与 `SHA256SUMS.txt`：
 
 ```bash
 git add build.sh && git commit -m "chore: bump version for release"
