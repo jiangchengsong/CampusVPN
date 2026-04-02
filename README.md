@@ -8,15 +8,15 @@
 
 ## 功能概览
 
-| 能力 | 说明 |
-|------|------|
-| **校园网识别** | 通过 CoreWLAN 读取当前 SSID（需授予「使用期间」**位置**权限，否则系统可能隐藏 Wi‑Fi 名称）。 |
-| **策略与自动连接** | 可配置 SSID 关键词（默认示例为 `xjtu`）、进入校园网自动连接、断线自动重连。 |
-| **EasyConnect** | 使用 `hagb/docker-easyconnect:cli` 镜像，由应用内嵌逻辑管理容器生命周期与健康检查。 |
-| **代理模式** | SOCKS5 本地端口（默认 `1080`）与系统级代理（`networksetup`）可切换。 |
-| **凭据** | VPN 账号密码存入 **Keychain**，不写入明文配置文件。 |
+| 能力                 | 说明                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| **校园网识别**       | 通过 CoreWLAN 读取当前 SSID（需授予「使用期间」**位置**权限，否则系统可能隐藏 Wi‑Fi 名称）。      |
+| **策略与自动连接**   | 可配置 SSID 关键词（默认示例为 `xjtu`）、进入校园网自动连接、断线自动重连。                       |
+| **EasyConnect**      | 使用 `hagb/docker-easyconnect:cli` 镜像，由应用内嵌逻辑管理容器生命周期与健康检查。               |
+| **代理模式**         | SOCKS5 本地端口（默认 `1080`）与系统级代理（`networksetup`）可切换。                              |
+| **凭据**             | VPN 账号密码存入 **Keychain**，不写入明文配置文件。                                               |
 | **GPU 监控（可选）** | 通过 SSH 并行查询多台机器上的 `nvidia-smi`，菜单栏摘要显示空闲/总卡数；详情在面板底部，减少误触。 |
-| **独立窗口** | 首次引导、日志、设置使用独立窗口，避免被菜单栏面板遮挡。 |
+| **独立窗口**         | 首次引导、日志、设置使用独立窗口，避免被菜单栏面板遮挡。                                          |
 
 ---
 
@@ -48,6 +48,23 @@ open /Applications/CampusVPN.app
 ```
 
 应用为 **LSUIElement**（纯菜单栏），Dock 中无图标。
+
+---
+
+## 下载成品（GitHub Releases）
+
+在本仓库 GitHub 的 **Releases** 页面下载 `CampusVPN-macos-arm64.zip`（由 CI 在 Apple Silicon 运行器上构建；文件名中的架构以实际发布为准）。解压后将 `CampusVPN.app` 拖入「应用程序」即可。
+
+首次从网络打开未公证的应用时，可在「访达」中右键 → **打开**，或在「系统设置 → 隐私与安全性」中允许运行。
+
+**维护者发布新版本**：先按需修改 `build.sh` 里的 `CFBundleShortVersionString` / `CFBundleVersion`，再打 tag 并推送，GitHub Actions 会自动构建并上传 zip 与 `SHA256SUMS.txt`：
+
+```bash
+git add build.sh && git commit -m "chore: bump version for release"
+git tag v1.0.1
+git push origin main
+git push origin v1.0.1
+```
 
 ---
 

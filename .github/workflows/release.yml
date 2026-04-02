@@ -1,0 +1,38 @@
+# 推送形如 v1.0.0 的 tag 时，构建 release 版 .app 并上传到 GitHub Release 资源区。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build CampusVPN.app (release)
+        run: |
+          chmod +x build.sh
+          ./build.sh release
+
+      - name: Zip app bundle
+        run: |
+          cd .build/release
+          ARCH=$(uname -m)
+          zip -r -y "../../CampusVPN-macos-${ARCH}.zip" CampusVPN.app
+          cd ../..
+          shasum -a 256 CampusVPN-macos-*.zip | tee SHA256SUMS.txt
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            CampusVPN-macos-*.zip
+            SHA256SUMS.txt
+          generate_release_notes: true
