@@ -11,10 +11,12 @@ final class NetworkMonitor: NSObject, ObservableObject {
     @Published var isConnectedToNetwork: Bool = false
     @Published var isCampusNetwork: Bool = false
     @Published var interfaceName: String?
+    @Published var locationAuthorized: Bool = false
 
     private let pathMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "com.campusvpn.networkmonitor")
     private let wifiClient = CWWiFiClient.shared()
+    private let locationManager = CLLocationManager()
     private let logger = AppLogger.shared
     private let settings = AppSettings.shared
     private var ssidPollTimer: Timer?
@@ -23,9 +25,12 @@ final class NetworkMonitor: NSObject, ObservableObject {
 
     override private init() {
         super.init()
+        locationManager.delegate = self
     }
 
     func startMonitoring() {
+        requestLocationPermission()
+
         pathMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in
                 guard let self else { return }
@@ -46,7 +51,7 @@ final class NetworkMonitor: NSObject, ObservableObject {
             wifiClient.delegate = self
             logger.info("Wi-Fi SSID 监听已启动")
         } catch {
-            logger.warn("CoreWLAN 事件监听失败，使用轮询模式: \(error.localizedDescription)")
+            logger.warn("CoreWLAN 事件监听失败，使用轮询: \(error.localizedDescription)")
         }
 
         ssidPollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
@@ -65,17 +70,30 @@ final class NetworkMonitor: NSObject, ObservableObject {
         try? wifiClient.stopMonitoringAllEvents()
     }
 
-    func updateWiFiInfo() {
-        guard let iface = wifiClient.interface() else {
-            currentSSID = nil
-            isCampusNetwork = false
-            interfaceName = nil
-            return
+    func requestLocationPermission() {
+        let status = locationManager.authorizationStatus
+        switch status {
+        case .notDetermined:
+            logger.info("请求位置权限以读取 Wi-Fi SSID...")
+            locationManager.requestWhenInUseAuthorization()
+        case .authorized, .authorizedAlways:
+            locationAuthorized = true
+            logger.info("位置权限已授权")
+        case .denied, .restricted:
+            locationAuthorized = false
+            logger.warn("位置权限被拒绝，无法自动识别 Wi-Fi 名称。请在系统设置 > 隐私与安全 > 定位服务中允许 CampusVPN")
+        @unknown default:
+            break
         }
+    }
 
-        interfaceName = iface.interfaceName
+    func updateWiFiInfo() {
+        let iface = wifiClient.interface()
+        interfaceName = iface?.interfaceName
 
-        if let ssid = iface.ssid() {
+        let ssid = iface?.ssid()
+
+        if let ssid, !ssid.isEmpty {
             let previousSSID = currentSSID
             currentSSID = ssid
 
@@ -83,19 +101,50 @@ final class NetworkMonitor: NSObject, ObservableObject {
             isCampusNetwork = ssid.lowercased().contains(keyword)
 
             if previousSSID != ssid {
-                logger.info("Wi-Fi 切换: \(previousSSID ?? "无") -> \(ssid) (\(isCampusNetwork ? "校园网" : "外部网络"))")
+                logger.info("Wi-Fi: \(previousSSID ?? "无") -> \(ssid) (\(isCampusNetwork ? "校园网" : "外部网络"))")
                 onNetworkChanged?()
             }
         } else {
-            if currentSSID != nil {
-                logger.info("Wi-Fi 断开")
-                onNetworkChanged?()
+            if isConnectedToNetwork && !locationAuthorized {
+                if currentSSID != "（需要位置权限）" {
+                    currentSSID = "（需要位置权限）"
+                    logger.warn("已连接 Wi-Fi 但无法读取名称，需要位置权限")
+                }
+                isCampusNetwork = false
+            } else {
+                if currentSSID != nil {
+                    logger.info("Wi-Fi 断开")
+                    onNetworkChanged?()
+                }
+                currentSSID = nil
+                isCampusNetwork = false
             }
-            currentSSID = nil
-            isCampusNetwork = false
         }
     }
 }
+
+// MARK: - CLLocationManagerDelegate
+
+extension NetworkMonitor: CLLocationManagerDelegate {
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            let status = manager.authorizationStatus
+            switch status {
+            case .authorized, .authorizedAlways:
+                self.locationAuthorized = true
+                self.logger.info("位置权限已授权，现在可以读取 Wi-Fi SSID")
+                self.updateWiFiInfo()
+            case .denied, .restricted:
+                self.locationAuthorized = false
+                self.logger.warn("位置权限被拒绝")
+            default:
+                break
+            }
+        }
+    }
+}
+
+// MARK: - CWEventDelegate
 
 extension NetworkMonitor: CWEventDelegate {
     nonisolated func ssidDidChangeForWiFiInterface(withName interfaceName: String) {

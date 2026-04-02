@@ -10,17 +10,17 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            gpuSection
-            Divider().padding(.vertical, 4)
             vpnSection
             Divider().padding(.vertical, 4)
             bottomBar
+            Divider().padding(.vertical, 4)
+            gpuSection
         }
         .padding(12)
         .frame(width: 300)
     }
 
-    // MARK: - GPU
+    // MARK: - GPU (底部，减少误触 popover)
 
     private var gpuSection: some View {
         VStack(spacing: 4) {
