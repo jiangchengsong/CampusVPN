@@ -18,6 +18,12 @@ struct MenuBarView: View {
         }
         .padding(12)
         .frame(width: 300)
+        .onAppear {
+            gpuMonitor.menuDidAppear()
+        }
+        .onDisappear {
+            gpuMonitor.menuDidDisappear()
+        }
     }
 
     // MARK: - GPU (底部，减少误触 popover)

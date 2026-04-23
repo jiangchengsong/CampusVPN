@@ -33,7 +33,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             await ProxyManager.shared.disableSystemProxy()
             await EasyConnectService.shared.stop()
-            GPUMonitorService.shared.stopPeriodicRefresh()
         }
     }
 
@@ -41,9 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func startServices() async {
         let engine = NetworkPolicyEngine.shared
         await engine.start(with: VPNState.shared)
-        GPUMonitorService.shared.startPeriodicRefresh(
-            interval: AppSettings.shared.gpuRefreshInterval
-        )
     }
 
     // MARK: - Window Management

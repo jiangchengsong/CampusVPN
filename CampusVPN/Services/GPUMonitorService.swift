@@ -13,24 +13,27 @@ final class GPUMonitorService: ObservableObject {
 
     private let logger = AppLogger.shared
     private let settings = AppSettings.shared
-    private var refreshTask: Task<Void, Never>?
-    private var timerTask: Task<Void, Never>?
+    private let menuRefreshStaleness: TimeInterval = 30
+    private var menuRefreshTask: Task<Void, Never>?
 
     private init() {}
 
-    func startPeriodicRefresh(interval: TimeInterval = 60) {
-        timerTask?.cancel()
-        timerTask = Task {
-            while !Task.isCancelled {
-                await refresh()
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+    func menuDidAppear() {
+        guard shouldRefreshOnMenuAppear else { return }
+
+        menuRefreshTask?.cancel()
+        menuRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            await self.refresh()
+            await MainActor.run {
+                self.menuRefreshTask = nil
             }
         }
     }
 
-    func stopPeriodicRefresh() {
-        timerTask?.cancel()
-        timerTask = nil
+    func menuDidDisappear() {
+        menuRefreshTask?.cancel()
+        menuRefreshTask = nil
     }
 
     func refresh() async {
@@ -38,12 +41,24 @@ final class GPUMonitorService: ObservableObject {
         isRefreshing = true
 
         let servers = settings.gpuServers
-        let proxyAvailable = await checkProxyAvailable()
+        guard !servers.isEmpty else {
+            isRefreshing = false
+            lastRefreshTime = Date()
+            return
+        }
+
+        let useProxy = shouldUseProxy()
+
+        if useProxy {
+            logger.debug("GPU 查询使用 SOCKS5 代理 (127.0.0.1:\(settings.socksPort))")
+        } else {
+            logger.debug("GPU 查询使用直连")
+        }
 
         let statuses = await withTaskGroup(of: ServerGPUStatus.self, returning: [ServerGPUStatus].self) { group in
             for server in servers {
                 group.addTask {
-                    await self.queryServer(server, useProxy: proxyAvailable)
+                    await self.queryServer(server, useProxy: useProxy)
                 }
             }
             var results: [ServerGPUStatus] = []
@@ -62,20 +77,53 @@ final class GPUMonitorService: ObservableObject {
         lastRefreshTime = Date()
     }
 
-    private func queryServer(_ server: GPUServer, useProxy: Bool) async -> ServerGPUStatus {
-        let sshOpts = "-o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR"
-        let proxyOpt = useProxy
-            ? "-o ProxyCommand='nc -x 127.0.0.1:\(settings.socksPort) %h %p'"
-            : ""
-        let nvidiaCmd = "nvidia-smi --query-gpu=index,name,utilization.gpu,memory.free,memory.total --format=csv,noheader,nounits"
-        let cmd = "/usr/bin/ssh \(sshOpts) \(proxyOpt) -p \(server.port) \(server.sshTarget) \"\(nvidiaCmd)\" 2>/dev/null"
+    private var shouldRefreshOnMenuAppear: Bool {
+        guard !isRefreshing else { return false }
+        guard let lastRefreshTime else { return true }
+        return Date().timeIntervalSince(lastRefreshTime) >= menuRefreshStaleness
+    }
 
-        let result = await ShellExecutor.run(cmd)
+    private func queryServer(_ server: GPUServer, useProxy: Bool) async -> ServerGPUStatus {
+        let nvidiaCmd = "nvidia-smi --query-gpu=index,name,utilization.gpu,memory.free,memory.total --format=csv,noheader,nounits"
+        var args = [
+            "-n",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=8",
+            "-o", "ConnectionAttempts=1",
+            "-o", "BatchMode=yes",
+            "-o", "NumberOfPasswordPrompts=0",
+            "-o", "ServerAliveInterval=5",
+            "-o", "ServerAliveCountMax=1",
+            "-o", "LogLevel=ERROR"
+        ]
+
+        if useProxy {
+            args += ["-o", "ProxyCommand=/usr/bin/nc -x 127.0.0.1:\(settings.socksPort) %h %p"]
+        }
+
+        args += ["-p", "\(server.port)", server.sshTarget, nvidiaCmd]
+
+        logger.debug("开始 GPU 查询 [\(server.alias)] \(useProxy ? "代理" : "直连")")
+
+        let result = await ShellExecutor.runExecutable(
+            "/usr/bin/ssh",
+            arguments: args,
+            timeout: 20
+        )
 
         guard result.succeeded, !result.stdout.isEmpty else {
+            let errDetail: String
+            if !result.stderr.isEmpty {
+                errDetail = result.stderr.components(separatedBy: "\n").first ?? result.stderr
+            } else if result.exitCode == 255 {
+                errDetail = "SSH 连接失败（网络不可达或认证失败）"
+            } else {
+                errDetail = "退出码 \(result.exitCode)"
+            }
+            logger.warn("GPU 查询失败 [\(server.alias)] \(server.host): \(errDetail)")
             return ServerGPUStatus(
                 id: server.alias, server: server, gpus: [], reachable: false,
-                errorMessage: "连接失败"
+                errorMessage: errDetail
             )
         }
 
@@ -114,14 +162,16 @@ final class GPUMonitorService: ObservableObject {
             }
     }
 
-    private func checkProxyAvailable() async -> Bool {
-        let port = settings.socksPort
-        let result = await ShellExecutor.run("nc -z 127.0.0.1 \(port) 2>/dev/null")
-        return result.succeeded
+    /// 判断本次 GPU 查询是否应该走 SOCKS 代理。
+    /// 校园网直连；外部网络且 VPN 已连接、代理端口可达时走代理。
+    private func shouldUseProxy() -> Bool {
+        if NetworkMonitor.shared.isCampusNetwork { return false }
+        let vpnState = VPNState.shared
+        return vpnState.connectionStatus == .connected && vpnState.proxyReachable
     }
 
     func openSSH(to server: GPUServer) {
-        let proxyAvailable = EasyConnectService.shared.proxyReachable
+        let proxyAvailable = shouldUseProxy()
         let socksPort = settings.socksPort
 
         var script = "tell application \"Terminal\"\n  activate\n  do script \""

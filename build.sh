@@ -70,6 +70,8 @@ PLIST
 
 echo "PkgInfo: APPL????" > "$CONTENTS/PkgInfo"
 
+codesign --force --deep --sign - "$APP_DIR"
+
 echo ""
 echo "=== 构建完成 ==="
 echo "应用路径: $APP_DIR"

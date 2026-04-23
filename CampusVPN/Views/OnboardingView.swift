@@ -3,10 +3,13 @@ import SwiftUI
 struct OnboardingView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var runtime = ContainerRuntime.shared
+    @ObservedObject private var networkMonitor = NetworkMonitor.shared
     @State private var password: String = ""
     @State private var currentStep: Int = 0
     @State private var isSettingUp = false
     @State private var setupError: String?
+
+    private let stepCount = 5
 
     var onFinish: () -> Void
 
@@ -22,7 +25,8 @@ struct OnboardingView: View {
                 switch currentStep {
                 case 0: welcomeStep
                 case 1: credentialsStep
-                case 2: runtimeStep
+                case 2: wifiPermissionStep
+                case 3: runtimeStep
                 default: doneStep
                 }
             }
@@ -35,17 +39,20 @@ struct OnboardingView: View {
                 .padding(16)
         }
         .frame(width: 520, height: 480)
+        .onAppear {
+            networkMonitor.refreshLocationPermissionStatus()
+        }
     }
 
     // MARK: - Step Indicator
 
     private var stepIndicator: some View {
         HStack(spacing: 0) {
-            ForEach(0..<4) { step in
+            ForEach(0..<stepCount, id: \.self) { step in
                 Circle()
                     .fill(step <= currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
                     .frame(width: 10, height: 10)
-                if step < 3 {
+                if step < stepCount - 1 {
                     Rectangle()
                         .fill(step < currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
                         .frame(height: 2)
@@ -182,9 +189,62 @@ struct OnboardingView: View {
             Spacer()
         }
         .task(id: currentStep) {
-            if currentStep == 2 && !runtime.isReady && !isSettingUp {
+            if currentStep == 3 && !runtime.isReady && !isSettingUp {
                 await setupRuntime()
             }
+        }
+    }
+
+    private var wifiPermissionStep: some View {
+        VStack(spacing: 18) {
+            Spacer()
+
+            Image(systemName: networkMonitor.locationAuthorized ? "location.fill" : "location")
+                .font(.system(size: 48))
+                .foregroundColor(networkMonitor.locationAuthorized ? .green : .accentColor)
+
+            Text("允许读取 Wi-Fi 名称")
+                .font(.title)
+                .fontWeight(.bold)
+
+            Text("macOS 需要位置权限后，应用才能读取当前 Wi-Fi 名称并判断是否在校园网。")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 48)
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(networkMonitor.locationAuthorized ? .green : .orange)
+                    .frame(width: 8, height: 8)
+                Text("位置权限：\(networkMonitor.locationPermissionDescription)")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+            }
+
+            if networkMonitor.canRequestLocationPermission {
+                Button("申请位置权限") {
+                    networkMonitor.requestLocationPermission()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            } else if networkMonitor.needsManualLocationSettings {
+                VStack(spacing: 8) {
+                    Text("已拒绝后，系统不会再次弹窗。请在系统设置中手动允许 CampusVPN。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("打开定位服务设置") {
+                        networkMonitor.openLocationPrivacySettings()
+                    }
+                    .controlSize(.large)
+                }
+            } else {
+                Text("已授权，可以继续。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
         }
     }
 
@@ -221,7 +281,7 @@ struct OnboardingView: View {
 
             Spacer()
 
-            if currentStep < 3 {
+            if currentStep < stepCount - 1 {
                 Button("下一步") {
                     handleNext()
                 }
@@ -229,7 +289,7 @@ struct OnboardingView: View {
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .disabled(currentStep == 1 && (settings.username.isEmpty || password.isEmpty))
-                .disabled(currentStep == 2 && isSettingUp)
+                .disabled(currentStep == 3 && isSettingUp)
             } else {
                 Button("开始使用") {
                     finishOnboarding()

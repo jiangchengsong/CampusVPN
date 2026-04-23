@@ -12,6 +12,12 @@ final class AppSettings: ObservableObject {
     @Published var socksPort: Int {
         didSet { UserDefaults.standard.set(socksPort, forKey: "socksPort") }
     }
+    @Published var jumpHost: String {
+        didSet { UserDefaults.standard.set(jumpHost, forKey: "jumpHost") }
+    }
+    @Published var jumpUser: String {
+        didSet { UserDefaults.standard.set(jumpUser, forKey: "jumpUser") }
+    }
     @Published var campusKeyword: String {
         didSet { UserDefaults.standard.set(campusKeyword, forKey: "campusKeyword") }
     }
@@ -33,8 +39,8 @@ final class AppSettings: ObservableObject {
     @Published var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
     }
-    @Published var gpuRefreshInterval: TimeInterval {
-        didSet { UserDefaults.standard.set(gpuRefreshInterval, forKey: "gpuRefreshInterval") }
+    @Published var proxyBypassDomains: String {
+        didSet { UserDefaults.standard.set(proxyBypassDomains, forKey: "proxyBypassDomains") }
     }
     @Published var gpuServers: [GPUServer] {
         didSet { saveGPUServers() }
@@ -44,14 +50,16 @@ final class AppSettings: ObservableObject {
         let defaults = UserDefaults.standard
         self.serverURL = defaults.string(forKey: "serverURL") ?? ""
         self.username = defaults.string(forKey: "username") ?? ""
-        self.socksPort = defaults.integer(forKey: "socksPort").nonZero ?? 1080
-        self.campusKeyword = defaults.string(forKey: "campusKeyword") ?? "xjtu"
+        self.socksPort = defaults.integer(forKey: "socksPort").nonZero ?? 1081
+        self.jumpHost = defaults.string(forKey: "jumpHost") ?? ""
+        self.jumpUser = defaults.string(forKey: "jumpUser") ?? ""
+        self.campusKeyword = defaults.string(forKey: "campusKeyword") ?? "campus"
+        self.proxyBypassDomains = defaults.string(forKey: "proxyBypassDomains") ?? ""
         self.autoConnect = defaults.object(forKey: "autoConnect") as? Bool ?? true
         self.autoReconnect = defaults.object(forKey: "autoReconnect") as? Bool ?? true
         self.launchAtLogin = defaults.bool(forKey: "launchAtLogin")
         self.easyConnectVersion = defaults.string(forKey: "easyConnectVersion") ?? "7.6.7"
         self.hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
-        self.gpuRefreshInterval = defaults.double(forKey: "gpuRefreshInterval").nonZeroD ?? 60
 
         if let modeRaw = defaults.string(forKey: "defaultMode"),
            let mode = ProxyMode(rawValue: modeRaw) {
@@ -77,8 +85,4 @@ final class AppSettings: ObservableObject {
 
 private extension Int {
     var nonZero: Int? { self == 0 ? nil : self }
-}
-
-private extension Double {
-    var nonZeroD: Double? { self == 0 ? nil : self }
 }

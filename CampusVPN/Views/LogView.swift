@@ -4,6 +4,7 @@ struct LogView: View {
     @StateObject private var logger = AppLogger.shared
     @State private var filterLevel: AppLogger.LogEntry.Level?
     @State private var autoScroll = true
+    @State private var showDebug = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,12 +23,15 @@ struct LogView: View {
             Spacer()
 
             Picker("级别", selection: $filterLevel) {
-                Text("全部").tag(Optional<AppLogger.LogEntry.Level>.none)
+                Text("常规").tag(Optional<AppLogger.LogEntry.Level>.none)
                 Text("INFO").tag(Optional<AppLogger.LogEntry.Level>.some(.info))
                 Text("WARN").tag(Optional<AppLogger.LogEntry.Level>.some(.warn))
                 Text("ERROR").tag(Optional<AppLogger.LogEntry.Level>.some(.error))
+                Text("DEBUG").tag(Optional<AppLogger.LogEntry.Level>.some(.debug))
             }
             .frame(width: 120)
+
+            Toggle("显示调试", isOn: $showDebug)
 
             Toggle("自动滚动", isOn: $autoScroll)
 
@@ -62,8 +66,10 @@ struct LogView: View {
     }
 
     private var filteredEntries: [AppLogger.LogEntry] {
-        guard let level = filterLevel else { return logger.entries }
-        return logger.entries.filter { $0.level == level }
+        if let level = filterLevel {
+            return logger.entries.filter { $0.level == level }
+        }
+        return showDebug ? logger.entries : logger.entries.filter { $0.level != .debug }
     }
 
     private func logRow(_ entry: AppLogger.LogEntry) -> some View {

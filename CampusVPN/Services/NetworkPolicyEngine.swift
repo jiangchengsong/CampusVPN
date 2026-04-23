@@ -4,7 +4,6 @@ import Foundation
 final class NetworkPolicyEngine: ObservableObject {
     static let shared = NetworkPolicyEngine()
 
-    private let vpnState: VPNState
     private let networkMonitor: NetworkMonitor
     private let easyConnect: EasyConnectService
     private let proxyManager: ProxyManager
@@ -16,11 +15,14 @@ final class NetworkPolicyEngine: ObservableObject {
 
     private var reconnectTask: Task<Void, Never>?
     private var healthTask: Task<Void, Never>?
+    private var runtimePreparationTask: Task<Bool, Never>?
+    private var connectTask: Task<Bool, Never>?
+    private var startupInProgress = false
+    private var pendingPolicyEvaluation = false
     private var reconnectAttempt: Int = 0
     private let maxReconnectAttempts = 10
 
     private init() {
-        self.vpnState = VPNState()
         self.networkMonitor = NetworkMonitor.shared
         self.easyConnect = EasyConnectService.shared
         self.proxyManager = ProxyManager.shared
@@ -29,48 +31,32 @@ final class NetworkPolicyEngine: ObservableObject {
         self.logger = AppLogger.shared
     }
 
-    func initialize(with state: VPNState) {
-        let _ = state
-    }
-
-    var sharedState: VPNState { vpnState }
-
     func start(with state: VPNState) async {
+        if isActive {
+            await evaluatePolicy(for: state)
+            return
+        }
+
         isActive = true
-
-        state.connectionStatus = .runtimeSetup
-        logger.info("正在初始化运行环境...")
-
-        let runtimeOK = await runtime.ensureReady()
-        state.runtimeReady = runtimeOK
-
-        if !runtimeOK {
-            state.connectionStatus = .error
-            state.lastError = "容器运行环境初始化失败"
-            logger.error("运行环境初始化失败，请检查 Docker/Colima")
-            return
-        }
-
-        let imageOK = await runtime.pullImageIfNeeded("hagb/docker-easyconnect:cli")
-        if !imageOK {
-            state.connectionStatus = .error
-            state.lastError = "EasyConnect 镜像拉取失败"
-            return
-        }
-
-        state.connectionStatus = .disconnected
-        logger.info("运行环境就绪，启动网络监控...")
+        startupInProgress = true
+        state.proxyMode = settings.defaultMode
 
         networkMonitor.onNetworkChanged = { [weak self] in
             guard let self else { return }
             Task { @MainActor in
-                await self.evaluatePolicy(for: state)
+                await self.handleNetworkChanged(for: state)
             }
         }
         networkMonitor.startMonitoring()
 
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        state.currentSSID = networkMonitor.currentSSID
+        state.isCampusNetwork = networkMonitor.isCampusNetwork
+        startupInProgress = false
+        pendingPolicyEvaluation = false
+
         await evaluatePolicy(for: state)
-        startHealthLoop(for: state)
     }
 
     func stop(for state: VPNState) async {
@@ -82,6 +68,15 @@ final class NetworkPolicyEngine: ObservableObject {
         if state.connectionStatus == .connected || state.connectionStatus == .connecting {
             await disconnect(for: state)
         }
+    }
+
+    private func handleNetworkChanged(for state: VPNState) async {
+        if startupInProgress {
+            pendingPolicyEvaluation = true
+            return
+        }
+
+        await evaluatePolicy(for: state)
     }
 
     func evaluatePolicy(for state: VPNState) async {
@@ -96,33 +91,106 @@ final class NetworkPolicyEngine: ObservableObject {
         state.isCampusNetwork = networkMonitor.isCampusNetwork
 
         if !networkMonitor.isConnectedToNetwork {
+            let changed = state.networkEnvironment != .disconnected
             state.networkEnvironment = .disconnected
-            logger.info("网络断开，等待重连...")
+            if changed {
+                logger.info("网络断开，等待重连")
+            }
             return
         }
 
         if networkMonitor.isCampusNetwork {
+            let changed = state.networkEnvironment != .campus
             state.networkEnvironment = .campus
-            logger.info("检测到校园网 (\(networkMonitor.currentSSID ?? ""))，使用直连模式")
-            await disconnect(for: state)
+            if changed {
+                logger.info("检测到校园网，使用直连模式")
+            }
+            if state.connectionStatus == .connected || state.connectionStatus == .connecting {
+                await disconnect(for: state)
+            }
             return
         }
 
         state.networkEnvironment = .external
         if settings.autoConnect && state.connectionStatus != .connected && state.connectionStatus != .connecting {
+            if !state.runtimeReady {
+                let ready = await prepareRuntimeIfNeeded(for: state)
+                if !ready {
+                    return
+                }
+            }
             logger.info("外部网络，自动连接 VPN...")
             await connect(for: state)
         }
     }
 
+    private func prepareRuntimeIfNeeded(for state: VPNState) async -> Bool {
+        if state.runtimeReady { return true }
+
+        if let task = runtimePreparationTask {
+            let ready = await task.value
+            state.runtimeReady = ready
+            return ready
+        }
+
+        state.connectionStatus = .runtimeSetup
+        state.lastError = nil
+        logger.info("初始化运行环境...")
+
+        let task = Task { @MainActor in
+            let runtimeOK = await runtime.ensureReady()
+            guard runtimeOK else { return false }
+            return await runtime.pullImageIfNeeded("hagb/docker-easyconnect:cli")
+        }
+        runtimePreparationTask = task
+
+        let ready = await task.value
+        runtimePreparationTask = nil
+        state.runtimeReady = ready
+
+        if ready {
+            state.connectionStatus = .disconnected
+            logger.info("运行环境就绪")
+        } else {
+            state.connectionStatus = .error
+            state.lastError = "容器运行环境初始化失败"
+            logger.error("运行环境初始化失败，请检查 Docker/Colima")
+        }
+
+        return ready
+    }
+
     func connect(for state: VPNState) async {
+        await connect(for: state, scheduleOnFailure: true, resetReconnectCounter: true)
+    }
+
+    private func connect(
+        for state: VPNState,
+        scheduleOnFailure: Bool,
+        resetReconnectCounter: Bool
+    ) async {
+        if let task = connectTask {
+            _ = await task.value
+            return
+        }
+
         guard state.connectionStatus != .connecting else { return }
 
         state.connectionStatus = .connecting
         state.lastError = nil
-        reconnectAttempt = 0
+        if resetReconnectCounter {
+            reconnectAttempt = 0
+            state.reconnectAttempt = 0
+        }
 
-        let success = await easyConnect.start()
+        let task = Task { @MainActor in
+            await self.easyConnect.start()
+        }
+        connectTask = task
+
+        let success = await task.value
+        connectTask = nil
+
         if success {
             state.connectionStatus = .connected
             state.proxyReachable = true
@@ -134,12 +202,13 @@ final class NetworkPolicyEngine: ObservableObject {
             }
 
             logger.info("VPN 连接成功")
+            startHealthLoop(for: state)
         } else {
             state.connectionStatus = .error
             state.lastError = "VPN 连接失败"
             logger.error("VPN 连接失败")
 
-            if settings.autoReconnect && !state.manualOverrideActive {
+            if scheduleOnFailure && settings.autoReconnect && !state.manualOverrideActive {
                 scheduleReconnect(for: state)
             }
         }
@@ -148,6 +217,9 @@ final class NetworkPolicyEngine: ObservableObject {
     func disconnect(for state: VPNState) async {
         state.connectionStatus = .disconnecting
         reconnectTask?.cancel()
+        healthTask?.cancel()
+        connectTask?.cancel()
+        connectTask = nil
 
         await proxyManager.disableSystemProxy()
         await easyConnect.stop()
@@ -205,18 +277,9 @@ final class NetworkPolicyEngine: ObservableObject {
                 }
 
                 logger.info("正在重连... 第 \(reconnectAttempt) 次")
-                let success = await easyConnect.start()
-                if success {
-                    state.connectionStatus = .connected
-                    state.proxyReachable = true
-                    state.containerRunning = true
-                    reconnectAttempt = 0
+                await connect(for: state, scheduleOnFailure: false, resetReconnectCounter: false)
+                if state.connectionStatus == .connected {
                     state.reconnectAttempt = 0
-
-                    if state.proxyMode == .systemWide {
-                        await proxyManager.enableSystemProxy(port: settings.socksPort)
-                    }
-                    logger.info("重连成功")
                     return
                 }
             }
@@ -228,18 +291,21 @@ final class NetworkPolicyEngine: ObservableObject {
         }
     }
 
+    /// 健康检查仅在 VPN 已连接（非校园网直连）时执行。
     private func startHealthLoop(for state: VPNState) {
         healthTask?.cancel()
         healthTask = Task {
             while !Task.isCancelled && isActive {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
                 guard !Task.isCancelled else { return }
+
+                guard state.connectionStatus == .connected else { continue }
 
                 await easyConnect.checkStatus()
                 state.containerRunning = easyConnect.isRunning
                 state.proxyReachable = easyConnect.proxyReachable
 
-                if state.connectionStatus == .connected && !easyConnect.proxyReachable {
+                if !easyConnect.proxyReachable {
                     logger.warn("检测到代理不可用，标记异常")
                     state.connectionStatus = .error
                     state.lastError = "代理端口不可达"
@@ -247,6 +313,7 @@ final class NetworkPolicyEngine: ObservableObject {
                     if settings.autoReconnect && !state.manualOverrideActive {
                         scheduleReconnect(for: state)
                     }
+                    return
                 }
             }
         }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var networkMonitor = NetworkMonitor.shared
     @State private var password: String = KeychainService.savedPassword ?? ""
 
     var body: some View {
@@ -20,6 +21,9 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 440)
         .padding()
+        .onAppear {
+            networkMonitor.refreshLocationPermissionStatus()
+        }
     }
 
     // MARK: - Connection
@@ -46,6 +50,12 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
                 }
+            }
+            Section("跳板机（用于建立代理隧道）") {
+                TextField("跳板机 IP", text: $settings.jumpHost)
+                    .textFieldStyle(.roundedBorder)
+                TextField("跳板机用户名", text: $settings.jumpUser)
+                    .textFieldStyle(.roundedBorder)
             }
         }
         .formStyle(.grouped)
@@ -94,17 +104,6 @@ struct SettingsView: View {
                 Button("恢复默认") {
                     settings.gpuServers = GPUServer.defaultServers
                 }
-
-                Spacer()
-
-                HStack {
-                    Text("刷新间隔")
-                    TextField("", value: $settings.gpuRefreshInterval, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 50)
-                    Text("秒")
-                }
-                .font(.caption)
             }
             .padding(8)
         }
@@ -130,6 +129,32 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            Section("Wi-Fi 识别权限") {
+                HStack {
+                    Text("位置权限")
+                    Spacer()
+                    Circle()
+                        .fill(networkMonitor.locationAuthorized ? .green : .orange)
+                        .frame(width: 8, height: 8)
+                    Text(networkMonitor.locationPermissionDescription)
+                        .foregroundColor(.secondary)
+                }
+
+                if networkMonitor.canRequestLocationPermission {
+                    Button("申请位置权限") {
+                        networkMonitor.requestLocationPermission()
+                    }
+                } else if networkMonitor.needsManualLocationSettings {
+                    Button("打开定位服务设置") {
+                        networkMonitor.openLocationPrivacySettings()
+                    }
+                }
+
+                Text("macOS 需要位置权限才能向应用开放当前 Wi-Fi 名称。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             Section("默认模式") {
                 Picker("代理模式", selection: $settings.defaultMode) {
                     ForEach(ProxyMode.allCases, id: \.self) { mode in
@@ -137,8 +162,19 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
+                .onChange(of: settings.defaultMode) { _, newValue in
+                    Task { await NetworkPolicyEngine.shared.switchMode(to: newValue, for: VPNState.shared) }
+                }
 
-                Text("SOCKS5：仅本地代理端口，适合终端/SSH 使用\n系统全局代理：全部流量通过代理，适合浏览器访问")
+                Text("SOCKS5：仅本地端口，终端可手动指定 socks5://127.0.0.1:端口。\n系统全局：通过 PAC 自动代理让浏览器走 SOCKS5 VPN 隧道。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("代理绕过（全局模式下直连的域名）") {
+                TextField("例如 edu.cn, *.xjtu.edu.cn", text: $settings.proxyBypassDomains)
+                    .textFieldStyle(.roundedBorder)
+                Text("逗号分隔；校园关键词对应的 *.关键词.edu.cn 会自动加入，无需重复填写")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
